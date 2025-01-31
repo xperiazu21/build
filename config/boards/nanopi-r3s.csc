@@ -1,49 +1,32 @@
-# Rockchip RK3566 quad core, dual GBe NIC
-BOARD_NAME="FriendlyElec NanoPi R3S"
-BOARDFAMILY="rk35xx"
+# Rockchip RK3566 quad core 1GB/2GB RAM eMMC 2x GbE USB3
+BOARD_NAME="NanoPi R3S"
+BOARDFAMILY="rockchip64"
 BOARD_MAINTAINER=""
 BOOTCONFIG="nanopi-r3s-rk3566_defconfig"
-KERNEL_TARGET="edge"
-#KERNEL_TEST_TARGET="edge"
-FULL_DESKTOP="yes"
-BOOT_LOGO="desktop"
+KERNEL_TARGET="current,edge"
+KERNEL_TEST_TARGET="current"
+DEFAULT_CONSOLE="serial"
+HAS_VIDEO_OUTPUT="no"
 BOOT_FDT_FILE="rockchip/rk3566-nanopi-r3s.dtb"
 IMAGE_PARTITION_TABLE="gpt"
-BOOT_SCENARIO="spl-blobs"
-BOOTFS_TYPE="fat" # Only for vendor/legacy
 
-function post_family_config_branch_edge__use_mainline_dtb_name() {
-	unset BOOT_FDT_FILE # boot.scr will use whatever u-boot detects and sets 'fdtfile' to
-	unset BOOTFS_TYPE   # mainline u-boot can boot ext4 directly
-}
 
-# Override family config for this board; let's avoid conditionals in family config.
-# vendor support not there yet
-function post_family_config__nanopi-r3s_use_vendor_uboot() {
-	BOOTSOURCE='https://github.com/radxa/u-boot.git'
-	BOOTBRANCH='branch:rk35xx-2024.01'
-	BOOTPATCHDIR="u-boot-radxa-latest"
+# Mainline U-Boot
+function post_family_config__nanopi-r3s_use_mainline_uboot() {
+	display_alert "$BOARD" "Using mainline U-Boot for $BOARD / $BRANCH" "info"
 
-	UBOOT_TARGET_MAP="BL31=$RKBIN_DIR/$BL31_BLOB ROCKCHIP_TPL=$RKBIN_DIR/$DDR_BLOB;;u-boot-rockchip.bin"
+	declare -g BOOTSOURCE="https://github.com/u-boot/u-boot.git" # We ❤️ Mainline U-Boot
+	declare -g BOOTBRANCH="tag:v2024.10"
+	declare -g BOOTPATCHDIR="v2024.10/board_${BOARD}"
+	# Don't set BOOTDIR, allow shared U-Boot source directory for disk space efficiency
 
+	declare -g UBOOT_TARGET_MAP="BL31=${RKBIN_DIR}/${BL31_BLOB} ROCKCHIP_TPL=${RKBIN_DIR}/${DDR_BLOB};;u-boot-rockchip.bin"
+
+	# Disable stuff from rockchip64_common; we're using binman here which does all the work already
 	unset uboot_custom_postprocess write_uboot_platform write_uboot_platform_mtd
 
+	# Just use the binman-provided u-boot-rockchip.bin, which is ready-to-go
 	function write_uboot_platform() {
-		dd if=$1/u-boot-rockchip.bin of=$2 seek=64 conv=notrunc status=none
-	}
-}
-
-function post_family_config_branch_edge__nanopi-r3s_use_mainline_uboot() {
-	BOOTCONFIG="nanopi-r3s-rk3566_defconfig"
-	BOOTSOURCE="https://github.com/u-boot/u-boot"
-	BOOTBRANCH="tag:v2024.10"
-	BOOTPATCHDIR="v2024.10"
-
-	UBOOT_TARGET_MAP="BL31=$RKBIN_DIR/$BL31_BLOB ROCKCHIP_TPL=$RKBIN_DIR/$DDR_BLOB;;u-boot-rockchip.bin"
-
-	unset uboot_custom_postprocess write_uboot_platform write_uboot_platform_mtd
-
-	function write_uboot_platform() {
-		dd if=$1/u-boot-rockchip.bin of=$2 seek=64 conv=notrunc status=none
+		dd "if=$1/u-boot-rockchip.bin" "of=$2" bs=32k seek=1 conv=notrunc status=none
 	}
 }
